@@ -1,0 +1,13 @@
+{
+  "itemGroup.simulated_diagram_snapshots": "Example Mod Tab",
+  "block.simulated_diagram_snapshots.example_block": "Example Block",
+  "item.simulated_diagram_snapshots.example_item": "Example Item",
+
+  "simulated_diagram_snapshots.configuration.title": "Simulated: Diagram Snapshots Configs",
+  "simulated_diagram_snapshots.configuration.section.simulated_diagram_snapshots.common.toml": "Simulated: Diagram Snapshots Configs",
+  "simulated_diagram_snapshots.configuration.section.simulated_diagram_snapshots.common.toml.title": "Simulated: Diagram Snapshots Configs",
+  "simulated_diagram_snapshots.configuration.items": "Item List",
+  "simulated_diagram_snapshots.configuration.logDirtBlock": "Log Dirt Block",
+  "simulated_diagram_snapshots.configuration.magicNumberIntroduction": "Magic Number Text",
+  "simulated_diagram_snapshots.configuration.magicNumber": "Magic Number"
+}
