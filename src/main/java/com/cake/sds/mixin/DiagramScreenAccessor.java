@@ -14,4 +14,5 @@ public interface DiagramScreenAccessor {
 
     @Accessor("note")
     DiagramStickyNote simulatedDiagramSnapshots$getNote();
+
 }

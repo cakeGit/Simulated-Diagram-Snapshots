@@ -1,17 +1,19 @@
 package com.cake.sds.diagram;
 
+import com.cake.sds.SimulatedDiagramSnapshots;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.cake.sds.SimulatedDiagramSnapshots;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
+import dev.ryanhcode.sable.sublevel.SubLevel;
 import dev.ryanhcode.sable.sublevel.plot.LevelPlot;
 import dev.simulated_team.simulated.content.entities.diagram.DiagramConfig;
 import dev.simulated_team.simulated.content.entities.diagram.screen.DiagramScreen;
 import dev.simulated_team.simulated.content.entities.diagram.screen.DiagramStickyNote;
 import dev.simulated_team.simulated.index.SimGUITextures;
+import dev.simulated_team.simulated.util.SimpleSubLevelGroupRenderer;
 import foundry.veil.api.client.render.framebuffer.AdvancedFbo;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
@@ -25,12 +27,11 @@ import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.util.Mth;
-import org.joml.Matrix4f;
-import org.joml.Quaternionf;
-import org.joml.Vector3d;
+import org.joml.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.Math;
 import java.util.Locale;
 
 public class DiagramSnapshotOverlay {
@@ -201,11 +202,7 @@ public class DiagramSnapshotOverlay {
             return true;
         }
         y += this.styleGroup.getHeight();
-        if (this.resolutionGroup.mouseClicked(mouseX, mouseY, button, sidebarX, y)) {
-            return true;
-        }
-
-        return false;
+        return this.resolutionGroup.mouseClicked(mouseX, mouseY, button, sidebarX, y);
     }
 
     public DiagramSnapshotButton getSaveBtn() {
@@ -264,16 +261,17 @@ public class DiagramSnapshotOverlay {
         final float paletteOffset = this.snapshotStyle == SnapshotStyle.DIAGRAM ? 0.25f : 1.0f;
         final float fadeScale = this.snapshotStyle == SnapshotStyle.DIAGRAM ? 1.0f : 0.5f;
 
-        // partialTicks=0 is intentional: exports a stable frame, not an interpolated one.
-        DiagramScreen.draw(subLevel, 0, plotCamera.orientation, plotCamera.projection, plotCamera.cameraPos,
-                w, h, this.exportFbo, this.exportOutlineFbo, this.exportFinalFbo,
-                paletteOffset, fadeScale, 0x2E3032, 0x696965);
+        if (this.snapshotStyle == SnapshotStyle.DIAGRAM) {
+            DiagramScreen.draw(subLevel, 0, plotCamera.orientation, plotCamera.projection, plotCamera.cameraPos,
+                    w, h, this.exportFbo, this.exportOutlineFbo, this.exportFinalFbo,
+                    paletteOffset, fadeScale, 0x2E3032, 0x696965);
+        } else {
+            drawClean(subLevel, 0, plotCamera.orientation, plotCamera.projection, plotCamera.cameraPos, this.exportFinalFbo);
+        }
 
-        final AdvancedFbo readFbo = this.snapshotStyle == SnapshotStyle.DIAGRAM
-                ? this.exportFinalFbo : this.exportFbo;
-        readFbo.bindRead();
+        this.exportFinalFbo.bindRead();
         final NativeImage image = new NativeImage(w, h, false);
-        RenderSystem.bindTexture(readFbo.getColorTextureAttachment(0).getId());
+        RenderSystem.bindTexture(this.exportFinalFbo.getColorTextureAttachment(0).getId());
         image.downloadTexture(0, true);
         image.flipY();
         AdvancedFbo.unbind();
@@ -313,7 +311,22 @@ public class DiagramSnapshotOverlay {
         }
     }
 
-    private record PlotCamera(Quaternionf orientation, Matrix4f projection, Vector3d cameraPos) {}
+    public static void drawClean(final SubLevel subLevel, final float partialTicks, final Quaternionf localOrientation, final Matrix4f projMatrix, final Vector3d cameraPos, final AdvancedFbo fbo) {
+        fbo.bind(true);
+        fbo.clear();
+
+        final Pose3dc renderPose = ((ClientSubLevel) subLevel).renderPose(partialTicks);
+        final Quaternionf orientation = new Quaternionf(renderPose.orientation()).conjugate();
+        orientation.premul(localOrientation.conjugate(new Quaternionf()));
+
+        LightingMixinHelper.isRenderingForSDS = true;
+        SimpleSubLevelGroupRenderer.renderChain(subLevel, fbo, new Matrix4f(), projMatrix, cameraPos, orientation, partialTicks);
+        LightingMixinHelper.isRenderingForSDS = false;
+    }
+
+    private record PlotCamera(Quaternionf orientation, Matrix4f projection, Vector3d cameraPos,
+                              Vector2f blockMaxScale) {
+    }
 
     private PlotCamera computePlotCamera() {
         final ClientSubLevel subLevel = this.screen.subLevel;
@@ -351,28 +364,34 @@ public class DiagramSnapshotOverlay {
         final Pose3dc renderPose = subLevel.renderPose(0);
         renderPose.transformPosition(localCameraPos);
 
-        return new PlotCamera(orientation, proj, localCameraPos);
+        //Transform screen (-1, -1, 0), (1, -1, 0) (1, 1, 0) extents to get the world space dimensions
+        final Vector3d bottomLeft = new Vector3d(-1, -1, 0);
+        final Vector3d bottomRight = new Vector3d(1, -1, 0);
+        final Vector3d topRight = new Vector3d(1, 1, 0);
+        orientation.transform(bottomLeft);
+        orientation.transform(bottomRight);
+        orientation.transform(topRight);
+        final Matrix4d invProj = new Matrix4d(proj).invert();
+        invProj.transformPosition(bottomLeft);
+        invProj.transformPosition(bottomRight);
+        invProj.transformPosition(topRight);
+
+        final double worldWidth = bottomRight.distance(bottomLeft);
+        final double worldHeight = topRight.distance(bottomRight);
+
+        return new PlotCamera(orientation, proj, localCameraPos, new Vector2f((float) worldWidth, (float) worldHeight));
     }
 
     private int[] computeExportDimensions(final PlotCamera plotCamera) {
         if (this.resolution == SnapshotResolution.PIXELATED) {
-            return new int[] { DiagramScreen.DIAGRAM_TEXTURE.width, DiagramScreen.DIAGRAM_TEXTURE.height };
+            return new int[]{DiagramScreen.DIAGRAM_TEXTURE.width, DiagramScreen.DIAGRAM_TEXTURE.height};
         }
 
         final float pixelsPerBlock = this.resolution.scale() * BLOCK_PIXEL_SCALE;
         // Visible world dimensions in blocks: width = 2*radius*aspect, height = 2*radius.
-        final float[] ortho = extractOrthoExtents(plotCamera.projection);
-        final int w = Math.max(1, Math.round(ortho[0] * pixelsPerBlock));
-        final int h = Math.max(1, Math.round(ortho[1] * pixelsPerBlock));
-        return new int[] { w, h };
-    }
-
-    private static float[] extractOrthoExtents(final Matrix4f proj) {
-        // For an ortho matrix built via JOML, the translation column holds the negated midpoints.
-        // The half-extents live on the diagonal of the upper-left 3x3.
-        final float halfWidth = Math.abs(proj.m00());
-        final float halfHeight = Math.abs(proj.m11());
-        return new float[] { halfWidth * 2.0f, halfHeight * 2.0f };
+        final int w = Math.max(1, Math.round(plotCamera.blockMaxScale.x * pixelsPerBlock));
+        final int h = Math.max(1, Math.round(plotCamera.blockMaxScale.y * pixelsPerBlock));
+        return new int[]{w, h};
     }
 
     private static long estimateMemoryUsageMB(final int w, final int h) {

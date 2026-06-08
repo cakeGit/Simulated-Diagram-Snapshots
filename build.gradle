@@ -45,7 +45,14 @@ repositories {
         name = 'Jared maven'
         url = 'https://maven.blamejared.com/'
     }
-
+    repositories {
+        maven {
+            url "https://maven.squiddev.cc"
+            content {
+                includeGroup("cc.tweaked")
+            }
+        }
+    }
     exclusiveContent {
         forRepository {
             maven {
@@ -57,7 +64,10 @@ repositories {
             includeGroup "maven.modrinth"
         }
     }
-
+    maven {
+        name = "vercteMavenReleases"
+        url = uri("https://maven.vercte.net/releases")
+    }
     maven {
         name = 'azmod-maven-snapshots'
         url = "https://maven.azmod.net/snapshots"
@@ -149,6 +159,8 @@ configurations {
 }
 
 dependencies {
+    implementation "net.vercte.ponderous_planes:ponderous_planes-mc1.21.1:1.0.1"
+
     //Registrate
     implementation("com.tterrag.registrate:Registrate:${registrate_version}")
 

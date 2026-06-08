@@ -2,27 +2,21 @@ package com.cake.sds.mixin;
 
 import com.cake.sds.diagram.DiagramSnapshotOverlay;
 import dev.simulated_team.simulated.content.entities.diagram.screen.DiagramScreen;
+import net.createmod.catnip.gui.AbstractSimiScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Renderable;
-import net.minecraft.client.gui.components.events.GuiEventListener;
-import net.minecraft.client.gui.narration.NarratableEntry;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
-import org.spongepowered.asm.mixin.gen.Invoker;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 @Mixin(DiagramScreen.class)
-public abstract class DiagramScreenMixin {
+public abstract class DiagramScreenMixin extends AbstractSimiScreen {
 
     @Unique
     private DiagramSnapshotOverlay sds$overlay;
-
-    @Invoker("addRenderableWidget")
-    abstract <T extends GuiEventListener & Renderable & NarratableEntry> T invokeAddRenderableWidget(T widget);
 
     @Inject(method = "init", at = @At("TAIL"))
     private void sds$onInit(final CallbackInfo ci) {
@@ -37,8 +31,8 @@ public abstract class DiagramScreenMixin {
                 accessor.simulatedDiagramSnapshots$getConfig(),
                 accessor.simulatedDiagramSnapshots$getNote());
 
-        this.invokeAddRenderableWidget(this.sds$overlay.getSaveBtn());
-        this.invokeAddRenderableWidget(this.sds$overlay.getConfigureBtn());
+        this.addRenderableWidget(this.sds$overlay.getSaveBtn());
+        this.addRenderableWidget(this.sds$overlay.getConfigureBtn());
     }
 
     @Inject(method = "renderWindow", at = @At("TAIL"))
@@ -63,7 +57,7 @@ public abstract class DiagramScreenMixin {
         }
     }
 
-    @Inject(method = "mouseClicked", at = @At("TAIL"))
+    @Inject(method = "mouseClicked", at = @At("TAIL"), cancellable = true)
     private void sds$onMouseClicked(final double mouseX, final double mouseY, final int button,
                                     final CallbackInfoReturnable<Boolean> cir) {
         if (this.sds$overlay == null || cir.getReturnValue()) {
