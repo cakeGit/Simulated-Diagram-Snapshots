@@ -2,7 +2,10 @@
   "required": true,
   "package": "com.cake.sds.mixin",
   "compatibilityLevel": "JAVA_21",
-  "mixins": [],
+  "mixins": [
+    "DiagramScreenAccessor",
+    "DiagramScreenMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   },
