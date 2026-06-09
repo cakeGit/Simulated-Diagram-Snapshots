@@ -1,9 +1,9 @@
 package com.cake.sds.mixin;
 
 import com.cake.sds.diagram.DiagramSnapshotOverlay;
+import com.mojang.blaze3d.vertex.PoseStack;
 import dev.simulated_team.simulated.content.entities.diagram.screen.DiagramScreen;
 import net.createmod.catnip.gui.AbstractSimiScreen;
-import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import org.spongepowered.asm.mixin.Mixin;
@@ -62,10 +62,10 @@ public abstract class DiagramScreenMixin extends AbstractSimiScreen {
         }
     }
 
-    @Inject(method = "mouseClicked", at = @At("TAIL"), cancellable = true)
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
     private void sds$onMouseClicked(final double mouseX, final double mouseY, final int button,
                                     final CallbackInfoReturnable<Boolean> cir) {
-        if (this.sds$overlay == null || cir.getReturnValue()) {
+        if (this.sds$overlay == null) {
             return;
         }
         if (this.sds$overlay.isSidebarVisible()) {
