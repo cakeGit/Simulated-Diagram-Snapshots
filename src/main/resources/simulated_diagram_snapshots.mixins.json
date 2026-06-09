@@ -4,8 +4,7 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "DiagramScreenAccessor",
-    "DiagramScreenMixin",
-    "SimpleSubLevelGroupRendererMixin"
+    "DiagramScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
@@ -14,6 +13,6 @@
     "requireAnnotations": true
   },
   "client": [
-    "LightingMixin"
+    "LevelRendererAccessor"
   ]
 }

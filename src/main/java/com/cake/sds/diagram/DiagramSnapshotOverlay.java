@@ -1,6 +1,8 @@
 package com.cake.sds.diagram;
 
 import com.cake.sds.SimulatedDiagramSnapshots;
+import com.cake.sds.diagram.render.CleanDiagramRenderer;
+import com.cake.sds.diagram.render.NotSoSimpleSubLevelGroupRenderer;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -13,7 +15,6 @@ import dev.simulated_team.simulated.content.entities.diagram.DiagramConfig;
 import dev.simulated_team.simulated.content.entities.diagram.screen.DiagramScreen;
 import dev.simulated_team.simulated.content.entities.diagram.screen.DiagramStickyNote;
 import dev.simulated_team.simulated.index.SimGUITextures;
-import dev.simulated_team.simulated.util.SimpleSubLevelGroupRenderer;
 import foundry.veil.api.client.render.framebuffer.AdvancedFbo;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
@@ -56,6 +57,17 @@ public class DiagramSnapshotOverlay {
     // before allocating. Covers: 2 colour FBOs + 1 colour+depth FBO + the CPU-side NativeImage
     // (all 4 bytes per pixel, RGBA8).
     private static final long MEMORY_CONFIRM_THRESHOLD_MB = 256;
+
+    // Near plane of the export ortho. Small positive value to avoid depth precision loss at z=0.
+    private static final float ORTHO_Z_NEAR = 0.1f;
+
+    // Uniform scale applied to the ortho extents to leave breathing room around the plot.
+    // For BLOCK resolutions this preserves the per-block pixel scale across plot sizes.
+    private static final float ORTHO_PADDING = 1.10f;
+
+    // Minimum half-extent for either axis of the ortho. Prevents degenerate frames for
+    // tiny or empty plots while keeping aspect ratio intact.
+    private static final float MIN_ORTHO_HALF_EXTENT = 2.0f;
 
     // ----------------------------------------------------------------------------
 
@@ -255,24 +267,28 @@ public class DiagramSnapshotOverlay {
 
         this.freeExportFbos();
         this.exportFbo = AdvancedFbo.withSize(w, h).addColorTextureBuffer().setDepthTextureBuffer().build(true);
+        exportFbo.clear(0, 0, 0, 0);
         this.exportOutlineFbo = AdvancedFbo.withSize(w, h).addColorTextureBuffer().build(true);
         this.exportFinalFbo = AdvancedFbo.withSize(w, h).addColorTextureBuffer().build(true);
+        exportFinalFbo.clear(0, 0, 0, 0);
 
         final float paletteOffset = this.snapshotStyle == SnapshotStyle.DIAGRAM ? 0.25f : 1.0f;
-        final float fadeScale = this.snapshotStyle == SnapshotStyle.DIAGRAM ? 1.0f : 0.5f;
+        final float fadeScale = this.snapshotStyle == SnapshotStyle.DIAGRAM ? 0.0f : 0.5f;
 
         if (this.snapshotStyle == SnapshotStyle.DIAGRAM) {
-            DiagramScreen.draw(subLevel, 0, plotCamera.orientation, plotCamera.projection, plotCamera.cameraPos,
+            CleanDiagramRenderer.draw(subLevel, 0, plotCamera.orientation, plotCamera.projection, plotCamera.cameraPos,
                     w, h, this.exportFbo, this.exportOutlineFbo, this.exportFinalFbo,
                     paletteOffset, fadeScale, 0x2E3032, 0x696965);
         } else {
-            drawClean(subLevel, 0, plotCamera.orientation, plotCamera.projection, plotCamera.cameraPos, this.exportFinalFbo);
+            drawClean(subLevel, 0, plotCamera.orientation, plotCamera.projection, plotCamera.cameraPos, this.exportFbo);
         }
 
-        this.exportFinalFbo.bindRead();
+        final AdvancedFbo finalFbo = this.snapshotStyle == SnapshotStyle.DIAGRAM ? this.exportFinalFbo : this.exportFbo;
+
+        finalFbo.bindRead();
         final NativeImage image = new NativeImage(w, h, false);
-        RenderSystem.bindTexture(this.exportFinalFbo.getColorTextureAttachment(0).getId());
-        image.downloadTexture(0, true);
+        RenderSystem.bindTexture(finalFbo.getColorTextureAttachment(0).getId());
+        image.downloadTexture(0, false);
         image.flipY();
         AdvancedFbo.unbind();
 
@@ -319,67 +335,140 @@ public class DiagramSnapshotOverlay {
         final Quaternionf orientation = new Quaternionf(renderPose.orientation()).conjugate();
         orientation.premul(localOrientation.conjugate(new Quaternionf()));
 
-        LightingMixinHelper.isRenderingForSDS = true;
-        SimpleSubLevelGroupRenderer.renderChain(subLevel, fbo, new Matrix4f(), projMatrix, cameraPos, orientation, partialTicks);
-        LightingMixinHelper.isRenderingForSDS = false;
+        NotSoSimpleSubLevelGroupRenderer.renderChain(subLevel, fbo, new Matrix4f(), projMatrix, cameraPos, orientation, partialTicks);
     }
 
     private record PlotCamera(Quaternionf orientation, Matrix4f projection, Vector3d cameraPos,
-                              Vector2f blockMaxScale) {
+                              Vector2f worldViewExtents) {
     }
 
     private PlotCamera computePlotCamera() {
         final ClientSubLevel subLevel = this.screen.subLevel;
         final LevelPlot plot = subLevel.getPlot();
         final BoundingBox3ic plotBounds = plot.getBoundingBox();
-        float radius = Math.max(Math.max(plotBounds.maxX() - plotBounds.minX(),
-                        plotBounds.maxY() - plotBounds.minY()),
-                plotBounds.maxZ() - plotBounds.minZ()) + 1;
-        radius *= 0.55F;
-        radius = Math.max(radius, 2.0f);
 
-        final Vector3d plotBoundsCenter = new Vector3d(
-                (plotBounds.minX() + plotBounds.maxX() + 1) / 2.0,
-                (plotBounds.minY() + plotBounds.maxY() + 1) / 2.0,
-                (plotBounds.minZ() + plotBounds.maxZ() + 1) / 2.0);
+        final Vector3d plotCenter = plotCenterOf(plotBounds);
+        final Vector3f plotHalfExtents = plotHalfExtents(plotBounds);
+        final Quaternionf orientation = this.buildCameraOrientation();
+        final Vector2f rotatedHalfExtents = rotatedPlotHalfExtents(orientation, plotHalfExtents);
 
-        final float aspect = (float) DiagramScreen.DIAGRAM_TEXTURE.width / DiagramScreen.DIAGRAM_TEXTURE.height;
-        final Matrix4f proj = new Matrix4f().ortho(
-                -radius * aspect, radius * aspect, -radius, radius, 0.1f, radius * 2.0f);
+        final Vector2f orthoHalfExtents = this.fitOrthoExtents(rotatedHalfExtents);
 
-        final Quaternionf orientation = new Quaternionf();
-        switch (this.cameraMode) {
-            case ISOMETRIC -> orientation.rotateY((float) Math.toRadians(45.0))
-                    .rotateX((float) Math.toRadians(35.264));
-            case DIMETRIC -> orientation.rotateY((float) Math.toRadians(45.0))
-                    .rotateX((float) Math.toRadians(28.12));
-            case TRIMETRIC -> orientation.rotateY((float) Math.toRadians(30.0))
-                    .rotateX((float) Math.toRadians(50.0));
-            default -> orientation.rotateY((float) Math.toRadians(this.config.yaw()))
-                    .rotateX((float) Math.toRadians(this.config.pitch()));
-        }
+        final float sphereRadius = boundingSphereRadius(plotHalfExtents);
+        final float cameraDistance = Math.max(sphereRadius + ORTHO_Z_NEAR, MIN_ORTHO_HALF_EXTENT);
+        final float farPlane = cameraDistance + sphereRadius;
 
-        final Vector3d localCameraPos = new Vector3d(plotBoundsCenter.add(
-                orientation.transform(new Vector3d(0, 0, radius))));
+        final Matrix4f projection = new Matrix4f().ortho(
+                -orthoHalfExtents.x, orthoHalfExtents.x,
+                -orthoHalfExtents.y, orthoHalfExtents.y,
+                ORTHO_Z_NEAR, farPlane);
+
+        final Vector3d localCameraPos = new Vector3d(plotCenter.add(
+                orientation.transform(new Vector3d(0, 0, cameraDistance))));
         final Pose3dc renderPose = subLevel.renderPose(0);
         renderPose.transformPosition(localCameraPos);
 
-        //Transform screen (-1, -1, 0), (1, -1, 0) (1, 1, 0) extents to get the world space dimensions
-        final Vector3d bottomLeft = new Vector3d(-1, -1, 0);
-        final Vector3d bottomRight = new Vector3d(1, -1, 0);
-        final Vector3d topRight = new Vector3d(1, 1, 0);
-        orientation.transform(bottomLeft);
-        orientation.transform(bottomRight);
-        orientation.transform(topRight);
-        final Matrix4d invProj = new Matrix4d(proj).invert();
-        invProj.transformPosition(bottomLeft);
-        invProj.transformPosition(bottomRight);
-        invProj.transformPosition(topRight);
+        return new PlotCamera(orientation, projection, localCameraPos,
+                new Vector2f(orthoHalfExtents.x * 2, orthoHalfExtents.y * 2));
+    }
 
-        final double worldWidth = bottomRight.distance(bottomLeft);
-        final double worldHeight = topRight.distance(bottomRight);
+    private Vector2f fitOrthoExtents(final Vector2f rotatedHalfExtents) {
+        if (this.resolution != SnapshotResolution.PIXELATED) {
+            return naturalOrthoExtents(rotatedHalfExtents);
+        }
+        final float diagramAspect = (float) DiagramScreen.DIAGRAM_TEXTURE.width / DiagramScreen.DIAGRAM_TEXTURE.height;
+        return aspectFitOrthoExtents(rotatedHalfExtents, diagramAspect, ORTHO_PADDING);
+    }
 
-        return new PlotCamera(orientation, proj, localCameraPos, new Vector2f((float) worldWidth, (float) worldHeight));
+    private static Vector2f naturalOrthoExtents(final Vector2f halfExtents) {
+        final float paddedX = halfExtents.x * ORTHO_PADDING;
+        final float paddedY = halfExtents.y * ORTHO_PADDING;
+        final float halfWidth = Math.max(paddedX, MIN_ORTHO_HALF_EXTENT);
+        final float halfHeight = Math.max(paddedY, MIN_ORTHO_HALF_EXTENT);
+        return new Vector2f(halfWidth, halfHeight);
+    }
+
+    private Quaternionf buildCameraOrientation() {
+        final Quaternionf orientation = new Quaternionf()
+                .rotateY(radians(this.config.yaw()))
+                .rotateX(radians(this.config.pitch()));
+        switch (this.cameraMode) {
+            case ISOMETRIC -> orientation.rotateY(radians(45.0f))
+                    .rotateX(radians(-35.264f));
+            case DIMETRIC -> orientation.rotateY(radians(45.0f))
+                    .rotateX(radians(-28.12f));
+            case TRIMETRIC -> orientation.rotateY(radians(30.0f))
+                    .rotateX(radians(-50.0f));
+        }
+        return orientation;
+    }
+
+    private static Vector3d plotCenterOf(final BoundingBox3ic plotBounds) {
+        return new Vector3d(
+                (plotBounds.minX() + plotBounds.maxX() + 1) / 2.0,
+                (plotBounds.minY() + plotBounds.maxY() + 1) / 2.0,
+                (plotBounds.minZ() + plotBounds.maxZ() + 1) / 2.0);
+    }
+
+    private static Vector3f plotHalfExtents(final BoundingBox3ic plotBounds) {
+        return new Vector3f(
+                (plotBounds.maxX() - plotBounds.minX() + 1) / 2.0f,
+                (plotBounds.maxY() - plotBounds.minY() + 1) / 2.0f,
+                (plotBounds.maxZ() - plotBounds.minZ() + 1) / 2.0f);
+    }
+
+    private static Vector2f rotatedPlotHalfExtents(final Quaternionf orientation, final Vector3f halfExtents) {
+        final Vector3f corner = new Vector3f();
+        final Quaternionf invOrientation = new Quaternionf(orientation).conjugate();
+        float maxAbsX = 0;
+        float maxAbsY = 0;
+        for (int cornerIndex = 0; cornerIndex < 8; cornerIndex++) {
+            corner.set(
+                    (cornerIndex & 1) == 0 ? -halfExtents.x : halfExtents.x,
+                    (cornerIndex & 2) == 0 ? -halfExtents.y : halfExtents.y,
+                    (cornerIndex & 4) == 0 ? -halfExtents.z : halfExtents.z);
+            invOrientation.transform(corner);
+            final float absX = Math.abs(corner.x);
+            final float absY = Math.abs(corner.y);
+            if (absX > maxAbsX) {
+                maxAbsX = absX;
+            }
+            if (absY > maxAbsY) {
+                maxAbsY = absY;
+            }
+        }
+        return new Vector2f(maxAbsX, maxAbsY);
+    }
+
+    private static Vector2f aspectFitOrthoExtents(final Vector2f halfExtents, final float aspect,
+                                                  final float padding) {
+        final float paddedX = halfExtents.x * padding;
+        final float paddedY = halfExtents.y * padding;
+        final float halfWidth;
+        final float halfHeight;
+        if (paddedX / aspect >= paddedY) {
+            halfWidth = Math.max(paddedX, MIN_ORTHO_HALF_EXTENT * aspect);
+            halfHeight = halfWidth / aspect;
+        } else {
+            halfHeight = Math.max(paddedY, MIN_ORTHO_HALF_EXTENT);
+            halfWidth = halfHeight * aspect;
+        }
+        return new Vector2f(halfWidth, halfHeight);
+    }
+
+    private static float boundingSphereRadius(final Vector3f halfExtents) {
+        return (float) Math.sqrt(
+                halfExtents.x * halfExtents.x +
+                        halfExtents.y * halfExtents.y +
+                        halfExtents.z * halfExtents.z);
+    }
+
+    private static float radians(final float degrees) {
+        return (float) Math.toRadians(degrees);
+    }
+
+    private static float radians(final double degrees) {
+        return (float) Math.toRadians(degrees);
     }
 
     private int[] computeExportDimensions(final PlotCamera plotCamera) {
@@ -388,9 +477,8 @@ public class DiagramSnapshotOverlay {
         }
 
         final float pixelsPerBlock = this.resolution.scale() * BLOCK_PIXEL_SCALE;
-        // Visible world dimensions in blocks: width = 2*radius*aspect, height = 2*radius.
-        final int w = Math.max(1, Math.round(plotCamera.blockMaxScale.x * pixelsPerBlock));
-        final int h = Math.max(1, Math.round(plotCamera.blockMaxScale.y * pixelsPerBlock));
+        final int w = Math.max(1, Math.round(plotCamera.worldViewExtents.x * pixelsPerBlock));
+        final int h = Math.max(1, Math.round(plotCamera.worldViewExtents.y * pixelsPerBlock));
         return new int[]{w, h};
     }
 
