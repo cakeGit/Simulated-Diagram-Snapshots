@@ -47,6 +47,11 @@ public class NotSoSimpleSubLevelGroupRenderer {
 
     public static boolean RENDERING_DIAGRAM_SNAPSHOT = false;
 
+    public enum LightingStyle {
+        DIAGRAM_DIFFUSE,
+        LEVEL
+    }
+
     private static final LevelPerspectiveCamera CAMERA = new LevelPerspectiveCamera();
     private static final Matrix4f TRANSFORM = new Matrix4f();
     private static final Matrix4f BACKUP_PROJECTION = new Matrix4f();
@@ -83,14 +88,18 @@ public class NotSoSimpleSubLevelGroupRenderer {
     }
 
     public static void renderChain(final SubLevel subLevel, final AdvancedFbo fbo, final Matrix4f modelView, final Matrix4f projectionMat, final Vector3d cameraPosition, final Quaternionf orientation, final float partialTicks) {
+        renderChain(subLevel, fbo, modelView, projectionMat, cameraPosition, orientation, partialTicks, LightingStyle.DIAGRAM_DIFFUSE);
+    }
+
+    public static void renderChain(final SubLevel subLevel, final AdvancedFbo fbo, final Matrix4f modelView, final Matrix4f projectionMat, final Vector3d cameraPosition, final Quaternionf orientation, final float partialTicks, final LightingStyle lightingStyle) {
         final ClientSubLevel clientSubLevel = (ClientSubLevel) subLevel;
         final ClientLevel level = clientSubLevel.getLevel();
         final Collection<ClientSubLevel> subLevels = dev.simulated_team.simulated.util.SimpleSubLevelGroupRenderer.getRenderedChain(clientSubLevel);
 
-        renderGroup(level, subLevels, fbo, modelView, projectionMat, cameraPosition, orientation, partialTicks, true);
+        renderGroup(level, subLevels, fbo, modelView, projectionMat, cameraPosition, orientation, partialTicks, true, lightingStyle);
     }
 
-    public static void renderGroup(final ClientLevel level, final Collection<ClientSubLevel> subLevels, final AdvancedFbo fbo, final Matrix4f modelView, final Matrix4f projectionMat, final Vector3d cameraPosition, final Quaternionf orientation, final float partialTicks, final boolean renderPlayers) {
+    public static void renderGroup(final ClientLevel level, final Collection<ClientSubLevel> subLevels, final AdvancedFbo fbo, final Matrix4f modelView, final Matrix4f projectionMat, final Vector3d cameraPosition, final Quaternionf orientation, final float partialTicks, final boolean renderPlayers, final LightingStyle lightingStyle) {
         // Finish anything previously being rendered for safety
         final MultiBufferSource.BufferSource bufferSource = Minecraft.getInstance().renderBuffers().bufferSource();
         bufferSource.endBatch();
@@ -129,7 +138,13 @@ public class NotSoSimpleSubLevelGroupRenderer {
         NotSoSimpleSubLevelGroupRenderer.RENDERING_DIAGRAM_SNAPSHOT = true;
 
         try {
-            RenderSystem.setupLevelDiffuseLighting(INVENTORY_DIFFUSE_LIGHT_0, INVENTORY_DIFFUSE_LIGHT_1);
+            if (lightingStyle == LightingStyle.DIAGRAM_DIFFUSE) {
+                RenderSystem.setupLevelDiffuseLighting(INVENTORY_DIFFUSE_LIGHT_0, INVENTORY_DIFFUSE_LIGHT_1);
+            } else if (level.effects().constantAmbientLight()) {
+                Lighting.setupNetherLevel();
+            } else {
+                Lighting.setupLevel();
+            }
 
             for (final RenderType layer : RenderType.chunkBufferLayers()) {
                 layer.setupRenderState();

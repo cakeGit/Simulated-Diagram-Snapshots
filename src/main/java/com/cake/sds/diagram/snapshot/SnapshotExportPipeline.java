@@ -2,6 +2,7 @@ package com.cake.sds.diagram.snapshot;
 
 import com.cake.sds.SimulatedDiagramSnapshots;
 import com.cake.sds.diagram.CameraMode;
+import com.cake.sds.diagram.SnapshotFrame;
 import com.cake.sds.diagram.SnapshotResolution;
 import com.cake.sds.diagram.SnapshotStyle;
 import com.cake.sds.diagram.render.CleanDiagramRenderer;
@@ -9,12 +10,13 @@ import com.cake.sds.diagram.render.NotSoSimpleSubLevelGroupRenderer;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import dev.ryanhcode.sable.companion.math.BoundingBox3i;
 import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
-import dev.ryanhcode.sable.sublevel.plot.LevelPlot;
 import dev.simulated_team.simulated.content.entities.diagram.screen.DiagramScreen;
+import dev.simulated_team.simulated.util.SimpleSubLevelGroupRenderer;
 import foundry.veil.api.client.render.framebuffer.AdvancedFbo;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
@@ -28,6 +30,7 @@ import java.lang.Math;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Locale;
 
 public class SnapshotExportPipeline {
@@ -64,7 +67,11 @@ public class SnapshotExportPipeline {
                        final SnapshotSettings settings, final float configYaw, final float configPitch) {
         final Minecraft mc = Minecraft.getInstance();
 
-        final PlotCamera plotCamera = this.computePlotCamera(subLevel, settings, configYaw, configPitch);
+        final BoundingBox3ic framingBounds = settings.frame == SnapshotFrame.CHAIN
+                ? computeChainBounds(clientSubLevel)
+                : clientSubLevel.getPlot().getBoundingBox();
+
+        final PlotCamera plotCamera = this.computePlotCamera(subLevel, framingBounds, settings, configYaw, configPitch);
         final int[] dims = this.computeExportDimensions(plotCamera, settings.resolution);
         final int w = dims[0];
         final int h = dims[1];
@@ -151,17 +158,15 @@ public class SnapshotExportPipeline {
         final Quaternionf orientation = new Quaternionf(renderPose.orientation()).conjugate();
         orientation.premul(localOrientation.conjugate(new Quaternionf()));
 
-        NotSoSimpleSubLevelGroupRenderer.renderChain(subLevel, fbo, new Matrix4f(), projMatrix, cameraPos, orientation, partialTicks);
+        NotSoSimpleSubLevelGroupRenderer.renderChain(subLevel, fbo, new Matrix4f(), projMatrix, cameraPos, orientation, partialTicks, NotSoSimpleSubLevelGroupRenderer.LightingStyle.LEVEL);
     }
 
-    private PlotCamera computePlotCamera(final SubLevel subLevel, final SnapshotSettings settings,
-                                          final float configYaw, final float configPitch) {
+    private PlotCamera computePlotCamera(final SubLevel subLevel, final BoundingBox3ic framingBounds,
+                                          final SnapshotSettings settings, final float configYaw, final float configPitch) {
         final ClientSubLevel clientSubLevel = (ClientSubLevel) subLevel;
-        final LevelPlot plot = clientSubLevel.getPlot();
-        final BoundingBox3ic plotBounds = plot.getBoundingBox();
 
-        final Vector3d plotCenter = plotCenterOf(plotBounds);
-        final Vector3f plotHalfExtents = plotHalfExtents(plotBounds);
+        final Vector3d plotCenter = plotCenterOf(framingBounds);
+        final Vector3f plotHalfExtents = plotHalfExtents(framingBounds);
         final Quaternionf orientation = buildCameraOrientation(settings.cameraMode, configYaw, configPitch);
         final Vector2f rotatedHalfExtents = rotatedPlotHalfExtents(orientation, plotHalfExtents);
 
@@ -330,5 +335,25 @@ public class SnapshotExportPipeline {
 
     private record PlotCamera(Quaternionf orientation, Matrix4f projection, Vector3d cameraPos,
                                Vector2f worldViewExtents) {
+    }
+
+    private static BoundingBox3ic computeChainBounds(final ClientSubLevel root) {
+        final Collection<ClientSubLevel> chain = SimpleSubLevelGroupRenderer.getRenderedChain(root);
+
+        BoundingBox3i union = null;
+        for (final ClientSubLevel subLevel : chain) {
+            final BoundingBox3ic bounds = subLevel.getPlot().getBoundingBox();
+            if (union == null) {
+                union = new BoundingBox3i(bounds);
+            } else {
+                union.expandTo(bounds);
+            }
+        }
+
+        if (union == null) {
+            return root.getPlot().getBoundingBox();
+        }
+
+        return union;
     }
 }

@@ -37,6 +37,7 @@ public class DiagramSnapshotOverlay {
 
     private OverlayRadioGroup<CameraMode> cameraGroup;
     private OverlayRadioGroup<SnapshotStyle> styleGroup;
+    private OverlayRadioGroup<SnapshotFrame> frameGroup;
     private OverlayRadioGroup<SnapshotResolution> resolutionGroup;
 
     private int totalRows;
@@ -76,6 +77,12 @@ public class DiagramSnapshotOverlay {
                 .addOption(SnapshotStyle.NORMAL, Component.translatable("simulated_diagram_snapshots.style.normal"))
                 .onChange(style -> this.settings.snapshotStyle = style);
 
+        this.frameGroup = new OverlayRadioGroup<SnapshotFrame>(
+                Component.translatable("simulated_diagram_snapshots.frame"))
+                .addOption(SnapshotFrame.NORMAL, Component.translatable("simulated_diagram_snapshots.frame.normal"))
+                .addOption(SnapshotFrame.CHAIN, Component.translatable("simulated_diagram_snapshots.frame.chain"))
+                .onChange(frame -> this.settings.frame = frame);
+
         this.resolutionGroup = new OverlayRadioGroup<SnapshotResolution>(
                 Component.translatable("simulated_diagram_snapshots.resolution"))
                 .addOption(SnapshotResolution.PIXELATED, Component.translatable("simulated_diagram_snapshots.resolution.pixelated"))
@@ -88,6 +95,7 @@ public class DiagramSnapshotOverlay {
 
         this.totalRows = this.cameraGroup.getRowCount()
                 + this.styleGroup.getRowCount()
+                + this.frameGroup.getRowCount()
                 + this.resolutionGroup.getRowCount();
     }
 
@@ -123,6 +131,8 @@ public class DiagramSnapshotOverlay {
         rowStart += this.cameraGroup.getRowCount();
         this.styleGroup.render(graphics, currentX, panelY, rowStart, font);
         rowStart += this.styleGroup.getRowCount();
+        this.frameGroup.render(graphics, currentX, panelY, rowStart, font);
+        rowStart += this.frameGroup.getRowCount();
         this.resolutionGroup.render(graphics, currentX, panelY, rowStart, font);
     }
 
@@ -146,6 +156,10 @@ public class DiagramSnapshotOverlay {
             return true;
         }
         rowStart += this.styleGroup.getRowCount();
+        if (this.frameGroup.mouseClicked(mouseX, mouseY, button, currentX, panelY, rowStart)) {
+            return true;
+        }
+        rowStart += this.frameGroup.getRowCount();
         return this.resolutionGroup.mouseClicked(mouseX, mouseY, button, currentX, panelY, rowStart);
     }
 
