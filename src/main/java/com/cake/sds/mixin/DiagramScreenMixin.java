@@ -3,6 +3,7 @@ package com.cake.sds.mixin;
 import com.cake.sds.diagram.DiagramSnapshotOverlay;
 import dev.simulated_team.simulated.content.entities.diagram.screen.DiagramScreen;
 import net.createmod.catnip.gui.AbstractSimiScreen;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import org.spongepowered.asm.mixin.Mixin;
@@ -45,8 +46,12 @@ public abstract class DiagramScreenMixin extends AbstractSimiScreen {
             final DiagramScreen self = (DiagramScreen) (Object) this;
             final int diagramX = self.width / 2 - DiagramScreen.DIAGRAM_TEXTURE.width / 2;
             final int diagramY = self.height / 2 - DiagramScreen.DIAGRAM_TEXTURE.height / 2;
+            final PoseStack ps = graphics.pose();
+            ps.pushPose();
+            ps.translate(0, 0, 5);
             this.sds$overlay.renderSidebar(graphics, mouseX, mouseY, partialTicks,
                     diagramX, diagramY, Minecraft.getInstance().font);
+            ps.popPose();
         }
     }
 

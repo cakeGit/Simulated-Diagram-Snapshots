@@ -37,7 +37,8 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * I gave up on mixins cause im a lazy bum
+ * I gave up on mixins cause im a lazy bum.
+ * Various changes to get normal looking lighting from the render
  */
 public class NotSoSimpleSubLevelGroupRenderer {
 
@@ -48,7 +49,6 @@ public class NotSoSimpleSubLevelGroupRenderer {
     private static final Matrix4f TRANSFORM = new Matrix4f();
     private static final Matrix4f BACKUP_PROJECTION = new Matrix4f();
     private static final CameraMatrices BACKUP_CAMERA_MATRICES = new CameraMatrices();
-    public static boolean RENDERING_SIMPLE = false;
 
     /**
      * @return the chain of sub-levels that should render with a given sub-level into a diagram
