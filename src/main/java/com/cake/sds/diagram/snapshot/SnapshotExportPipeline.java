@@ -2,7 +2,6 @@ package com.cake.sds.diagram.snapshot;
 
 import com.cake.sds.SimulatedDiagramSnapshots;
 import com.cake.sds.diagram.CameraMode;
-import com.cake.sds.diagram.SnapshotFrame;
 import com.cake.sds.diagram.SnapshotResolution;
 import com.cake.sds.diagram.SnapshotStyle;
 import com.cake.sds.diagram.render.CleanDiagramRenderer;
@@ -67,9 +66,7 @@ public class SnapshotExportPipeline {
                        final SnapshotSettings settings, final float configYaw, final float configPitch) {
         final Minecraft mc = Minecraft.getInstance();
 
-        final BoundingBox3ic framingBounds = settings.frame == SnapshotFrame.CHAIN
-                ? computeChainBounds(clientSubLevel)
-                : clientSubLevel.getPlot().getBoundingBox();
+        final BoundingBox3ic framingBounds = computeChainBounds(clientSubLevel);
 
         final PlotCamera plotCamera = this.computePlotCamera(subLevel, framingBounds, settings, configYaw, configPitch);
         final int[] dims = this.computeExportDimensions(plotCamera, settings.resolution);

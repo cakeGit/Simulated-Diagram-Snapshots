@@ -12,16 +12,20 @@ public class PaperPanel {
     public static final int HEADER_HEIGHT = 19;
     public static final int ROW_HEIGHT = 11;
     public static final int BOTTOM_HEIGHT = SimGUITextures.DIAGRAM_PAPER.height - HEADER_HEIGHT - ROW_HEIGHT;
-    public static final int TAB_CX = -6;
+    public static final int TAB_CX = PAPER_WIDTH - 6;
+    public static final int TAB_HIDE_RANGE = 9;
 
     private static final int LINE_Y_FIRST = 19;
     private static final int ATLAS_X = SimGUITextures.DIAGRAM_PAPER.startX;
     private static final int ATLAS_Y = SimGUITextures.DIAGRAM_PAPER.startY;
     private static final float SLIDE_SPEED = 0.4f;
+    private static final float TAB_SLIDE_SPEED = 0.1f;
 
     private boolean visible;
     private float offset;
     private float lastOffset;
+    private float lastTabOffset;
+    private float tabOffset;
 
     public boolean isVisible() {
         return this.visible;
@@ -38,10 +42,17 @@ public class PaperPanel {
     public void tick() {
         this.lastOffset = this.offset;
         this.offset = Mth.lerp(SLIDE_SPEED, this.offset, this.visible ? PAPER_WIDTH : 0);
+
+        this.lastTabOffset = this.tabOffset;
+        this.tabOffset = Mth.lerp(this.visible ? TAB_SLIDE_SPEED : TAB_SLIDE_SPEED, this.tabOffset, this.visible ? 1 : 0);
     }
 
     public float getOffset(final float partialTicks) {
         return Mth.lerp(partialTicks, this.lastOffset, this.offset);
+    }
+
+    public float getTabHide(final float partialTicks) {
+        return (1.0f - Mth.lerp(partialTicks, this.lastTabOffset, this.tabOffset)) * TAB_HIDE_RANGE;
     }
 
     public int getContentHeight(final int totalRows) {

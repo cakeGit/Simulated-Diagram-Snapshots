@@ -2,6 +2,7 @@ package com.cake.sds.diagram.overlay;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import dev.simulated_team.simulated.index.SimGUITextures;
+import net.createmod.catnip.gui.UIRenderHelper;
 import net.createmod.catnip.theme.Color;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -17,6 +18,13 @@ public class OverlayRadioGroup<E extends Enum<E>> {
     private static final int SELECTED_COLOR = 0xff6d7177;
     private static final int DESELECTED_COLOR = 0xaaaaaaaa;
     private static final int SHADOW_COLOR = 0xffe2d9c3;
+
+    private static final int TAB_WIDTH = SimGUITextures.DIAGRAM_TAB.width;
+    private static final int TAB_HEIGHT = SimGUITextures.DIAGRAM_TAB.height;
+    private static final int TAB_TEX_LEFT = SimGUITextures.DIAGRAM_TAB.startX;
+    private static final int TAB_TEX_TOP = SimGUITextures.DIAGRAM_TAB.startY;
+    private static final int TEXT_RIGHT_PADDING = 7;
+    private static final int LABEL_LEFT_PADDING = PaperPanel.ROW_HEIGHT - 4;
 
     private final Component label;
     private final List<E> options = new ArrayList<>();
@@ -57,35 +65,39 @@ public class OverlayRadioGroup<E extends Enum<E>> {
     }
 
     /**
-     * @param x      paper left edge in screen space
-     * @param y      paper top edge in screen space
+     * @param x        paper left edge in screen space
+     * @param y        paper top edge in screen space
      * @param rowStart global row index within the paper grid (0 = first row)
+     * @param tabHide  pixel offset that hides the tab (positive = tucked into paper)
      */
-    public void render(final GuiGraphics graphics, final int x, final int y, final int rowStart, final Font font) {
+    public void render(final GuiGraphics graphics, final int x, final int y, final int rowStart,
+                        final float tabHide, final Font font) {
         final PoseStack ps = graphics.pose();
 
         final int labelTextY = y + 11 + rowStart * PaperPanel.ROW_HEIGHT;
         ps.pushPose();
-        ps.translate(x + PaperPanel.ROW_HEIGHT + 7, labelTextY, 0);
+        ps.translate(x + LABEL_LEFT_PADDING, labelTextY, 0);
         ps.scale(0.75F, 0.75F, 0.0F);
         graphics.drawString(font, this.label, 0, 0, LABEL_COLOR, false);
         ps.popPose();
 
         for (int i = 0; i < this.options.size(); i++) {
             final int globalRow = rowStart + 1 + i;
-            final int textY = y + 11 + globalRow * PaperPanel.ROW_HEIGHT;
             final int lineY = y + PaperPanel.HEADER_HEIGHT + globalRow * PaperPanel.ROW_HEIGHT;
+            final int textY = lineY - 8;
 
             final boolean selected = i == this.selectedIndex;
             final int color = selected ? SELECTED_COLOR : DESELECTED_COLOR;
 
+            final int tabX = x + PaperPanel.TAB_CX - (int) tabHide;
             final int tabY = lineY - 10;
-            SimGUITextures.DIAGRAM_TAB.render(graphics, x + PaperPanel.TAB_CX, tabY, new Color(color));
+            drawMirroredTab(graphics, tabX, tabY, new Color(color));
 
-            // Text
             ps.pushPose();
-            ps.translate(x + PaperPanel.ROW_HEIGHT + 7, textY, 0);
             ps.scale(0.75F, 0.75F, 0.0F);
+            final int textWidth = font.width(this.displays.get(i));
+            final int textRightX = (x + PaperPanel.PAPER_WIDTH - TEXT_RIGHT_PADDING);
+            ps.translate(textRightX / 0.75F - textWidth, textY / 0.75F, 0);
             if (selected) {
                 graphics.drawString(font, this.displays.get(i), 1, 1, SHADOW_COLOR, false);
                 graphics.drawString(font, this.displays.get(i), 0, 0, SELECTED_COLOR, false);
@@ -97,43 +109,57 @@ public class OverlayRadioGroup<E extends Enum<E>> {
     }
 
     /**
-     * @param x      paper left edge in screen space
-     * @param y      paper top edge in screen space
+     * Draws DIAGRAM_TAB mirrored horizontally (so it points into the right-side paper).
+     */
+    private static void drawMirroredTab(final GuiGraphics graphics, final int x, final int y, final Color c) {
+        final int texLeft = TAB_TEX_LEFT;
+        final int texRight = TAB_TEX_LEFT + TAB_WIDTH;
+        UIRenderHelper.drawColoredTexture(graphics, c, x, y, 0,
+                (float) texRight, (float) TAB_TEX_TOP,
+                TAB_WIDTH, TAB_HEIGHT,
+                SimGUITextures.DIAGRAM_TAB.texWidth, SimGUITextures.DIAGRAM_TAB.texHeight);
+    }
+
+    /**
+     * @param x        paper left edge in screen space
+     * @param y        paper top edge in screen space
      * @param rowStart global row index within the paper grid
+     * @param tabHide  pixel offset that hides the tab (positive = tucked into paper)
      */
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button,
-                                 final int x, final int y, final int rowStart) {
+                                 final int x, final int y, final int rowStart, final float tabHide) {
         for (int i = 0; i < this.options.size(); i++) {
             final int globalRow = rowStart + 1 + i;
             final int lineY = y + PaperPanel.HEADER_HEIGHT + globalRow * PaperPanel.ROW_HEIGHT;
 
-            final int tabLeft = x + PaperPanel.TAB_CX;
-            final int tabTop = lineY - 10;
-            if (mouseX >= tabLeft && mouseX < tabLeft + 11
-                    && mouseY >= tabTop && mouseY < tabTop + 10) {
-                if (i == this.selectedIndex) {
-                    return true;
-                }
-                this.selectedIndex = i;
-                if (this.onChange != null) {
-                    this.onChange.accept(this.options.get(i));
-                }
-                return true;
+            final int tabX = x + PaperPanel.TAB_CX - (int) tabHide;
+            final int tabY = lineY - 10;
+            if (mouseX >= tabX && mouseX < tabX + TAB_WIDTH
+                    && mouseY >= tabY && mouseY < tabY + TAB_HEIGHT) {
+                return this.select(i);
             }
 
-            if (mouseX >= x + PaperPanel.ROW_HEIGHT + 7
-                    && mouseX < x + PaperPanel.ROW_HEIGHT + 7 + 60
-                    && mouseY >= lineY - 10 && mouseY < lineY + PaperPanel.ROW_HEIGHT) {
-                if (i == this.selectedIndex) {
-                    return true;
-                }
-                this.selectedIndex = i;
-                if (this.onChange != null) {
-                    this.onChange.accept(this.options.get(i));
-                }
-                return true;
+            final int textRightX = x + PaperPanel.PAPER_WIDTH - TEXT_RIGHT_PADDING;
+            final int textY = lineY - 8;
+            final Font font = net.minecraft.client.Minecraft.getInstance().font;
+            final int textWidth = (int) (font.width(this.displays.get(i)) * 0.75F);
+            final int textLeftX = textRightX - textWidth;
+            if (mouseX >= textLeftX && mouseX < textRightX
+                    && mouseY >= textY && mouseY < textY + font.lineHeight * 0.75F) {
+                return this.select(i);
             }
         }
         return false;
+    }
+
+    private boolean select(final int i) {
+        if (i == this.selectedIndex) {
+            return true;
+        }
+        this.selectedIndex = i;
+        if (this.onChange != null) {
+            this.onChange.accept(this.options.get(i));
+        }
+        return true;
     }
 }

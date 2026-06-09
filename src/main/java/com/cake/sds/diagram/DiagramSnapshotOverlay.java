@@ -37,7 +37,6 @@ public class DiagramSnapshotOverlay {
 
     private OverlayRadioGroup<CameraMode> cameraGroup;
     private OverlayRadioGroup<SnapshotStyle> styleGroup;
-    private OverlayRadioGroup<SnapshotFrame> frameGroup;
     private OverlayRadioGroup<SnapshotResolution> resolutionGroup;
 
     private int totalRows;
@@ -77,12 +76,6 @@ public class DiagramSnapshotOverlay {
                 .addOption(SnapshotStyle.NORMAL, Component.translatable("simulated_diagram_snapshots.style.normal"))
                 .onChange(style -> this.settings.snapshotStyle = style);
 
-        this.frameGroup = new OverlayRadioGroup<SnapshotFrame>(
-                Component.translatable("simulated_diagram_snapshots.frame"))
-                .addOption(SnapshotFrame.NORMAL, Component.translatable("simulated_diagram_snapshots.frame.normal"))
-                .addOption(SnapshotFrame.CHAIN, Component.translatable("simulated_diagram_snapshots.frame.chain"))
-                .onChange(frame -> this.settings.frame = frame);
-
         this.resolutionGroup = new OverlayRadioGroup<SnapshotResolution>(
                 Component.translatable("simulated_diagram_snapshots.resolution"))
                 .addOption(SnapshotResolution.PIXELATED, Component.translatable("simulated_diagram_snapshots.resolution.pixelated"))
@@ -95,7 +88,6 @@ public class DiagramSnapshotOverlay {
 
         this.totalRows = this.cameraGroup.getRowCount()
                 + this.styleGroup.getRowCount()
-                + this.frameGroup.getRowCount()
                 + this.resolutionGroup.getRowCount();
     }
 
@@ -119,6 +111,8 @@ public class DiagramSnapshotOverlay {
             return;
         }
 
+        final float tabHide = this.paperPanel.getTabHide(partialTicks);
+
         final int panelX = diagramX + DiagramScreen.DIAGRAM_TEXTURE.width + GAP - PaperPanel.PAPER_WIDTH;
         final int panelY = diagramY;
 
@@ -127,13 +121,11 @@ public class DiagramSnapshotOverlay {
         this.paperPanel.render(graphics, currentX, panelY, this.totalRows, partialTicks);
 
         int rowStart = 0;
-        this.cameraGroup.render(graphics, currentX, panelY, rowStart, font);
+        this.cameraGroup.render(graphics, currentX, panelY, rowStart, tabHide, font);
         rowStart += this.cameraGroup.getRowCount();
-        this.styleGroup.render(graphics, currentX, panelY, rowStart, font);
+        this.styleGroup.render(graphics, currentX, panelY, rowStart, tabHide, font);
         rowStart += this.styleGroup.getRowCount();
-        this.frameGroup.render(graphics, currentX, panelY, rowStart, font);
-        rowStart += this.frameGroup.getRowCount();
-        this.resolutionGroup.render(graphics, currentX, panelY, rowStart, font);
+        this.resolutionGroup.render(graphics, currentX, panelY, rowStart, tabHide, font);
     }
 
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button,
@@ -143,24 +135,21 @@ public class DiagramSnapshotOverlay {
         }
 
         final float offset = this.paperPanel.getOffset(1.0f);
+        final float tabHide = this.paperPanel.getTabHide(1.0f);
         final int panelX = diagramX + DiagramScreen.DIAGRAM_TEXTURE.width + GAP - PaperPanel.PAPER_WIDTH;
         final int panelY = diagramY;
         final int currentX = panelX + (int) offset;
 
         int rowStart = 0;
-        if (this.cameraGroup.mouseClicked(mouseX, mouseY, button, currentX, panelY, rowStart)) {
+        if (this.cameraGroup.mouseClicked(mouseX, mouseY, button, currentX, panelY, rowStart, tabHide)) {
             return true;
         }
         rowStart += this.cameraGroup.getRowCount();
-        if (this.styleGroup.mouseClicked(mouseX, mouseY, button, currentX, panelY, rowStart)) {
+        if (this.styleGroup.mouseClicked(mouseX, mouseY, button, currentX, panelY, rowStart, tabHide)) {
             return true;
         }
         rowStart += this.styleGroup.getRowCount();
-        if (this.frameGroup.mouseClicked(mouseX, mouseY, button, currentX, panelY, rowStart)) {
-            return true;
-        }
-        rowStart += this.frameGroup.getRowCount();
-        return this.resolutionGroup.mouseClicked(mouseX, mouseY, button, currentX, panelY, rowStart);
+        return this.resolutionGroup.mouseClicked(mouseX, mouseY, button, currentX, panelY, rowStart, tabHide);
     }
 
     public DiagramSnapshotButton getSaveBtn() {
