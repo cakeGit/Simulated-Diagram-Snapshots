@@ -9,13 +9,13 @@ import net.minecraft.util.Mth;
 public class PaperPanel {
 
     public static final int PAPER_WIDTH = SimGUITextures.DIAGRAM_PAPER.width;
-    public static final int HEADER_HEIGHT = 41;
+    public static final int HEADER_HEIGHT = 19;
     public static final int ROW_HEIGHT = 11;
-    public static final int BOTTOM_HEIGHT = SimGUITextures.DIAGRAM_PAPER.height - HEADER_HEIGHT - ROW_HEIGHT;
     public static final int TAB_CX = PAPER_WIDTH - 6;
     public static final int TAB_HIDE_RANGE = 9;
 
     private static final int LINE_Y_FIRST = 41;
+    public static final int BOTTOM_HEIGHT = SimGUITextures.DIAGRAM_PAPER.height - LINE_Y_FIRST - ROW_HEIGHT;
     private static final int ATLAS_X = SimGUITextures.DIAGRAM_PAPER.startX;
     private static final int ATLAS_Y = SimGUITextures.DIAGRAM_PAPER.startY;
     private static final float SLIDE_SPEED = 0.4f;
@@ -44,7 +44,7 @@ public class PaperPanel {
         this.offset = Mth.lerp(SLIDE_SPEED, this.offset, this.visible ? PAPER_WIDTH : 0);
 
         this.lastTabOffset = this.tabOffset;
-        this.tabOffset = Mth.lerp(this.visible ? TAB_SLIDE_SPEED : TAB_SLIDE_SPEED, this.tabOffset, this.visible ? 1 : 0);
+        this.tabOffset = Mth.lerp(TAB_SLIDE_SPEED, this.tabOffset, this.visible ? 1 : 0);
     }
 
     public float getOffset(final float partialTicks) {
@@ -53,10 +53,6 @@ public class PaperPanel {
 
     public float getTabHide(final float partialTicks) {
         return (1.0f - Mth.lerp(partialTicks, this.lastTabOffset, this.tabOffset)) * TAB_HIDE_RANGE;
-    }
-
-    public int getContentHeight(final int totalRows) {
-        return HEADER_HEIGHT + totalRows * ROW_HEIGHT + BOTTOM_HEIGHT;
     }
 
     public void render(final GuiGraphics graphics, final int baseX, final int baseY,
@@ -74,19 +70,19 @@ public class PaperPanel {
         ps.pushPose();
         ps.translate(baseX, baseY, 0);
 
-        graphics.blit(loc, 0, 0, ATLAS_X, ATLAS_Y, PAPER_WIDTH, HEADER_HEIGHT, texW, texH);
+        graphics.blit(loc, 0, 0, ATLAS_X, ATLAS_Y, PAPER_WIDTH, LINE_Y_FIRST, texW, texH);
 
         int renderedMiddleRows = totalRows - 7;
         for (int i = 0; i < renderedMiddleRows; i++) {
             graphics.blit(loc,
-                    0, HEADER_HEIGHT + i * ROW_HEIGHT,
+                    0, LINE_Y_FIRST + i * ROW_HEIGHT,
                     ATLAS_X, ATLAS_Y + LINE_Y_FIRST,
                     PAPER_WIDTH, ROW_HEIGHT,
                     texW, texH);
         }
 
         graphics.blit(loc,
-                0, HEADER_HEIGHT + renderedMiddleRows * ROW_HEIGHT,
+                0, LINE_Y_FIRST + renderedMiddleRows * ROW_HEIGHT,
                 ATLAS_X, ATLAS_Y + LINE_Y_FIRST + ROW_HEIGHT,
                 PAPER_WIDTH, BOTTOM_HEIGHT,
                 texW, texH);

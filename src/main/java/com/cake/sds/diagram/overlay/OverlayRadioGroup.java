@@ -1,8 +1,8 @@
 package com.cake.sds.diagram.overlay;
 
 import com.mojang.blaze3d.vertex.PoseStack;
+import dev.engine_room.flywheel.lib.transform.TransformStack;
 import dev.simulated_team.simulated.index.SimGUITextures;
-import net.createmod.catnip.gui.UIRenderHelper;
 import net.createmod.catnip.theme.Color;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -21,8 +21,6 @@ public class OverlayRadioGroup<E extends Enum<E>> {
 
     private static final int TAB_WIDTH = SimGUITextures.DIAGRAM_TAB.width;
     private static final int TAB_HEIGHT = SimGUITextures.DIAGRAM_TAB.height;
-    private static final int TAB_TEX_LEFT = SimGUITextures.DIAGRAM_TAB.startX;
-    private static final int TAB_TEX_TOP = SimGUITextures.DIAGRAM_TAB.startY;
     private static final int TEXT_RIGHT_PADDING = 7;
     private static final int LABEL_LEFT_PADDING = PaperPanel.ROW_HEIGHT - 4;
 
@@ -71,7 +69,7 @@ public class OverlayRadioGroup<E extends Enum<E>> {
      * @param tabHide  pixel offset that hides the tab (positive = tucked into paper)
      */
     public void render(final GuiGraphics graphics, final int x, final int y, final int rowStart,
-                        final float tabHide, final Font font) {
+                       final float tabHide, final Font font) {
         final PoseStack ps = graphics.pose();
 
         final int labelTextY = y + 11 + rowStart * PaperPanel.ROW_HEIGHT;
@@ -91,7 +89,12 @@ public class OverlayRadioGroup<E extends Enum<E>> {
 
             final int tabX = x + PaperPanel.TAB_CX - (int) tabHide;
             final int tabY = lineY - 10;
-            drawMirroredTab(graphics, tabX, tabY, new Color(color));
+            ps.pushPose();
+            ps.translate(tabX + (SimGUITextures.DIAGRAM_TAB.width / 2f), tabY + (SimGUITextures.DIAGRAM_TAB.height / 2f), 0);
+            TransformStack.of(ps).rotateZ((float) Math.PI);
+            ps.translate(-(SimGUITextures.DIAGRAM_TAB.width / 2f), -(SimGUITextures.DIAGRAM_TAB.height / 2f), 0);
+            SimGUITextures.DIAGRAM_TAB.render(graphics, 0, 0, new Color(color));
+            ps.popPose();
 
             ps.pushPose();
             ps.scale(0.75F, 0.75F, 0.0F);
@@ -109,25 +112,13 @@ public class OverlayRadioGroup<E extends Enum<E>> {
     }
 
     /**
-     * Draws DIAGRAM_TAB mirrored horizontally (so it points into the right-side paper).
-     */
-    private static void drawMirroredTab(final GuiGraphics graphics, final int x, final int y, final Color c) {
-        final int texLeft = TAB_TEX_LEFT;
-        final int texRight = TAB_TEX_LEFT + TAB_WIDTH;
-        UIRenderHelper.drawColoredTexture(graphics, c, x, y, 0,
-                (float) texRight, (float) TAB_TEX_TOP,
-                TAB_WIDTH, TAB_HEIGHT,
-                SimGUITextures.DIAGRAM_TAB.texWidth, SimGUITextures.DIAGRAM_TAB.texHeight);
-    }
-
-    /**
      * @param x        paper left edge in screen space
      * @param y        paper top edge in screen space
      * @param rowStart global row index within the paper grid
      * @param tabHide  pixel offset that hides the tab (positive = tucked into paper)
      */
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button,
-                                 final int x, final int y, final int rowStart, final float tabHide) {
+                                final int x, final int y, final int rowStart, final float tabHide) {
         for (int i = 0; i < this.options.size(); i++) {
             final int globalRow = rowStart + 1 + i;
             final int lineY = y + PaperPanel.HEADER_HEIGHT + globalRow * PaperPanel.ROW_HEIGHT;

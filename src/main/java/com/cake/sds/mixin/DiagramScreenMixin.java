@@ -42,17 +42,15 @@ public abstract class DiagramScreenMixin extends AbstractSimiScreen {
         if (this.sds$overlay == null) {
             return;
         }
-        if (this.sds$overlay.isSidebarVisible() || this.sds$overlay.isAnimating()) {
-            final DiagramScreen self = (DiagramScreen) (Object) this;
-            final int diagramX = self.width / 2 - DiagramScreen.DIAGRAM_TEXTURE.width / 2;
-            final int diagramY = self.height / 2 - DiagramScreen.DIAGRAM_TEXTURE.height / 2;
-            final PoseStack ps = graphics.pose();
-            ps.pushPose();
-            ps.translate(0, 0, 5);
-            this.sds$overlay.renderSidebar(graphics, mouseX, mouseY, partialTicks,
-                    diagramX, diagramY, Minecraft.getInstance().font);
-            ps.popPose();
-        }
+        final DiagramScreen self = (DiagramScreen) (Object) this;
+        final int diagramX = self.width / 2 - DiagramScreen.DIAGRAM_TEXTURE.width / 2;
+        final int diagramY = self.height / 2 - DiagramScreen.DIAGRAM_TEXTURE.height / 2;
+        final PoseStack ps = graphics.pose();
+        ps.pushPose();
+        ps.translate(0, 0, 5);
+        this.sds$overlay.renderSidebar(graphics, mouseX, mouseY, partialTicks,
+                diagramX, diagramY, Minecraft.getInstance().font);
+        ps.popPose();
     }
 
     @Inject(method = "tick", at = @At("TAIL"))

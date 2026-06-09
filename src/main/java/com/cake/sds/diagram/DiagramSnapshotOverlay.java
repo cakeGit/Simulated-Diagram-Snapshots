@@ -104,12 +104,9 @@ public class DiagramSnapshotOverlay {
     }
 
     public void renderSidebar(final GuiGraphics graphics, final int mouseX, final int mouseY,
-                               final float partialTicks, final int diagramX, final int diagramY,
-                               final Font font) {
+                              final float partialTicks, final int diagramX, final int diagramY,
+                              final Font font) {
         final float offset = this.paperPanel.getOffset(partialTicks);
-        if (offset < 1) {
-            return;
-        }
 
         final float tabHide = this.paperPanel.getTabHide(partialTicks);
 
@@ -129,7 +126,7 @@ public class DiagramSnapshotOverlay {
     }
 
     public boolean mouseClicked(final double mouseX, final double mouseY, final int button,
-                                 final int diagramX, final int diagramY) {
+                                final int diagramX, final int diagramY) {
         if (!this.paperPanel.isVisible()) {
             return false;
         }
