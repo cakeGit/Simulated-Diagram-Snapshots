@@ -13,6 +13,7 @@
     "requireAnnotations": true
   },
   "client": [
-    "LevelRendererAccessor"
+    "LevelRendererAccessor",
+    "RopeStrandRendererMixin"
   ]
 }

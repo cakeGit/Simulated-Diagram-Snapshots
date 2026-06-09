@@ -45,6 +45,8 @@ public class NotSoSimpleSubLevelGroupRenderer {
     private static final Vector3f INVENTORY_DIFFUSE_LIGHT_0 = (new Vector3f(0.2F, 1.0F, 1.0F)).normalize();
     private static final Vector3f INVENTORY_DIFFUSE_LIGHT_1 = (new Vector3f(-0.2F, -1.0F, 0.0F)).normalize();
 
+    public static boolean RENDERING_DIAGRAM_SNAPSHOT = false;
+
     private static final LevelPerspectiveCamera CAMERA = new LevelPerspectiveCamera();
     private static final Matrix4f TRANSFORM = new Matrix4f();
     private static final Matrix4f BACKUP_PROJECTION = new Matrix4f();
@@ -123,6 +125,8 @@ public class NotSoSimpleSubLevelGroupRenderer {
 
         final AdvancedFbo drawFbo = VeilRenderSystem.renderer().getDynamicBufferManger().getDynamicFbo(fbo);
         drawFbo.bind(true);
+
+        NotSoSimpleSubLevelGroupRenderer.RENDERING_DIAGRAM_SNAPSHOT = true;
 
         try {
             RenderSystem.setupLevelDiffuseLighting(INVENTORY_DIFFUSE_LIGHT_0, INVENTORY_DIFFUSE_LIGHT_1);
@@ -221,6 +225,7 @@ public class NotSoSimpleSubLevelGroupRenderer {
 
             bufferSource.endBatch();
         } finally {
+            NotSoSimpleSubLevelGroupRenderer.RENDERING_DIAGRAM_SNAPSHOT = false;
             if (level.effects().constantAmbientLight()) {
                 Lighting.setupNetherLevel();
             } else {
