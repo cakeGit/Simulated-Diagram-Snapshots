@@ -46,6 +46,7 @@ public class DiagramSnapshotButton extends AbstractWidget {
     protected void renderWidget(final GuiGraphics guiGraphics, final int mouseX, final int mouseY, final float partialTicks) {
         final Color color = this.isHovered() ? BUTTON_COLOR : DULL_BUTTON_COLOR;
 
+        SDSGUITextures.BUTTON_BACKGROUND.render(guiGraphics, this.getX() - 1, this.getY() - 1);
         RenderSystem.enableBlend();
         if (this.icon instanceof SDSGUITextures sds) {
             sds.render(guiGraphics, this.getX() - 1, this.getY() - 1, color);
@@ -68,4 +69,5 @@ public class DiagramSnapshotButton extends AbstractWidget {
     @Override
     protected void updateWidgetNarration(final NarrationElementOutput narrationElementOutput) {
     }
+
 }

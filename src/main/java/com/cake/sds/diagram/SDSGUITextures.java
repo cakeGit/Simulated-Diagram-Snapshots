@@ -10,8 +10,9 @@ import org.jetbrains.annotations.NotNull;
 
 public enum SDSGUITextures implements ScreenElement {
 
-    SNAPSHOT_SAVE("snapshot_icons", 0, 0, 16, 16, 32, 16),
-    SNAPSHOT_CONFIGURE("snapshot_icons", 16, 0, 16, 16, 32, 16);
+    SNAPSHOT_SAVE("snapshot_icons", 0, 0, 16, 16, 32, 32),
+    SNAPSHOT_CONFIGURE("snapshot_icons", 16, 0, 16, 16, 32, 32),
+    BUTTON_BACKGROUND("snapshot_icons", 0, 16, 16, 16, 32, 32);
 
     @NotNull
     public final ResourceLocation location;

@@ -5,7 +5,9 @@ import com.cake.sds.diagram.SnapshotResolution;
 import com.cake.sds.diagram.SnapshotStyle;
 
 public class SnapshotSettings {
+
     public CameraMode cameraMode = CameraMode.NORMAL;
-    public SnapshotStyle snapshotStyle = SnapshotStyle.DIAGRAM;
-    public SnapshotResolution resolution = SnapshotResolution.PIXELATED;
+    public SnapshotStyle snapshotStyle = SnapshotStyle.NORMAL;
+    public SnapshotResolution resolution = SnapshotResolution.BLOCK_X8;
+
 }

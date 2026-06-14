@@ -19,7 +19,7 @@ public class PaperPanel {
     private static final int ATLAS_X = SimGUITextures.DIAGRAM_PAPER.startX;
     private static final int ATLAS_Y = SimGUITextures.DIAGRAM_PAPER.startY;
     private static final float SLIDE_SPEED = 0.4f;
-    private static final float TAB_SLIDE_SPEED = 0.1f;
+    private static final float TAB_SLIDE_SPEED = 0.4f;
 
     private boolean visible;
     private float offset;
@@ -57,11 +57,6 @@ public class PaperPanel {
 
     public void render(final GuiGraphics graphics, final int baseX, final int baseY,
                        final int totalRows, final float partialTicks) {
-        final float o = this.getOffset(partialTicks);
-        if (o < 1) {
-            return;
-        }
-
         final ResourceLocation loc = SimGUITextures.DIAGRAM_PAPER.location;
         final int texW = SimGUITextures.DIAGRAM_PAPER.texWidth;
         final int texH = SimGUITextures.DIAGRAM_PAPER.texHeight;
@@ -75,18 +70,19 @@ public class PaperPanel {
         int renderedMiddleRows = totalRows - 7;
         for (int i = 0; i < renderedMiddleRows; i++) {
             graphics.blit(loc,
-                    0, LINE_Y_FIRST + i * ROW_HEIGHT,
-                    ATLAS_X, ATLAS_Y + LINE_Y_FIRST,
-                    PAPER_WIDTH, ROW_HEIGHT,
-                    texW, texH);
+                0, LINE_Y_FIRST + i * ROW_HEIGHT,
+                ATLAS_X, ATLAS_Y + LINE_Y_FIRST,
+                PAPER_WIDTH, ROW_HEIGHT,
+                texW, texH);
         }
 
         graphics.blit(loc,
-                0, LINE_Y_FIRST + renderedMiddleRows * ROW_HEIGHT,
-                ATLAS_X, ATLAS_Y + LINE_Y_FIRST + ROW_HEIGHT,
-                PAPER_WIDTH, BOTTOM_HEIGHT,
-                texW, texH);
+            0, LINE_Y_FIRST + renderedMiddleRows * ROW_HEIGHT,
+            ATLAS_X, ATLAS_Y + LINE_Y_FIRST + ROW_HEIGHT,
+            PAPER_WIDTH, BOTTOM_HEIGHT,
+            texW, texH);
 
         ps.popPose();
     }
+
 }

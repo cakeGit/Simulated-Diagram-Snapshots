@@ -2,7 +2,7 @@
   "stages": [
     {
       "type": "veil:blit",
-      "shader": "simulated:contraption_diagram/outline_diagram",
+      "shader": "simulated_diagram_snapshots:contraption_diagram_clean/outline_diagram_clean",
       "in": "simulated:diagram",
       "out": "simulated:diagram_final",
       "clear": false

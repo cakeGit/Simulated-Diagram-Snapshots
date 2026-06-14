@@ -29,14 +29,13 @@ public abstract class DiagramScreenMixin extends AbstractSimiScreen {
 
         this.sds$overlay = new DiagramSnapshotOverlay();
         this.sds$overlay.init(self, diagramX, diagramY,
-                accessor.simulatedDiagramSnapshots$getConfig(),
-                accessor.simulatedDiagramSnapshots$getNote());
+            accessor.simulatedDiagramSnapshots$getConfig());
 
         this.addRenderableWidget(this.sds$overlay.getSaveBtn());
         this.addRenderableWidget(this.sds$overlay.getConfigureBtn());
     }
 
-    @Inject(method = "renderWindow", at = @At("TAIL"))
+    @Inject(method = "renderWindow", at = @At(value = "INVOKE", shift = At.Shift.AFTER, target = "Ldev/simulated_team/simulated/content/entities/diagram/screen/DiagramScreen;renderContents(Ldev/ryanhcode/sable/sublevel/SubLevel;F)V"))
     private void sds$onRenderWindow(final GuiGraphics graphics, final int mouseX, final int mouseY,
                                     final float partialTicks, final CallbackInfo ci) {
         if (this.sds$overlay == null) {
@@ -47,9 +46,8 @@ public abstract class DiagramScreenMixin extends AbstractSimiScreen {
         final int diagramY = self.height / 2 - DiagramScreen.DIAGRAM_TEXTURE.height / 2;
         final PoseStack ps = graphics.pose();
         ps.pushPose();
-        ps.translate(0, 0, 5);
         this.sds$overlay.renderSidebar(graphics, mouseX, mouseY, partialTicks,
-                diagramX, diagramY, Minecraft.getInstance().font);
+            diagramX, diagramY, Minecraft.getInstance().font);
         ps.popPose();
     }
 
@@ -82,4 +80,5 @@ public abstract class DiagramScreenMixin extends AbstractSimiScreen {
             this.sds$overlay.onClose();
         }
     }
+
 }

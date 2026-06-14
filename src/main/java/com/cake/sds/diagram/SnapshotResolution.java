@@ -1,7 +1,7 @@
 package com.cake.sds.diagram;
 
 public enum SnapshotResolution {
-    PIXELATED(1),
+    //    PIXELATED(1),
     BLOCK_X4(4),
     BLOCK_X8(8),
     BLOCK_X16(16),

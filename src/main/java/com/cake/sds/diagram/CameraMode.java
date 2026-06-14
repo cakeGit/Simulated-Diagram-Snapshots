@@ -1,5 +1,5 @@
 package com.cake.sds.diagram;
 
 public enum CameraMode {
-    NORMAL, ISOMETRIC, DIMETRIC, TRIMETRIC
+    NORMAL, ISOMETRIC, DIMETRIC, LOW_DIMETRIC, LOW_ISOMETRIC
 }

@@ -1,5 +1,7 @@
 package com.cake.sds.diagram.render;
 
+import com.cake.sds.ext.CoolerLightTextureExtension;
+import com.cake.sds.ext.VanillaSubLevelRenderDispatcherExtension;
 import com.cake.sds.mixin.LevelRendererAccessor;
 import com.mojang.blaze3d.platform.Lighting;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -37,8 +39,7 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * I gave up on mixins cause im a lazy bum.
- * Various changes to get normal looking lighting from the render
+ * I gave up on mixins cause im a lazy bum. Various changes to get normal looking lighting from the render
  */
 public class NotSoSimpleSubLevelGroupRenderer {
 
@@ -49,7 +50,7 @@ public class NotSoSimpleSubLevelGroupRenderer {
 
     public enum LightingStyle {
         DIAGRAM_DIFFUSE,
-        LEVEL
+        FULLBRIGHT_LEVEL
     }
 
     private static final LevelPerspectiveCamera CAMERA = new LevelPerspectiveCamera();
@@ -139,12 +140,11 @@ public class NotSoSimpleSubLevelGroupRenderer {
 
         try {
             if (lightingStyle == LightingStyle.DIAGRAM_DIFFUSE) {
-                RenderSystem.setupLevelDiffuseLighting(INVENTORY_DIFFUSE_LIGHT_0, INVENTORY_DIFFUSE_LIGHT_1);
-            } else if (level.effects().constantAmbientLight()) {
                 Lighting.setupNetherLevel();
             } else {
                 Lighting.setupLevel();
             }
+            ((CoolerLightTextureExtension) lightTexture).sds$makeCleanLightTexture(1.0f);
 
             for (final RenderType layer : RenderType.chunkBufferLayers()) {
                 layer.setupRenderState();
@@ -211,6 +211,11 @@ public class NotSoSimpleSubLevelGroupRenderer {
             // Render normal block-entities
             SubLevelRenderDispatcher.get().renderBlockEntities(subLevels, beRenderer, cameraPosition.x, cameraPosition.y, cameraPosition.z, partialTicks);
 
+            // Render global block-entities
+            if (SubLevelRenderDispatcher.get() instanceof VanillaSubLevelRenderDispatcherExtension vslrde) {
+                vslrde.renderGlobalBlockEntities(subLevels, beRenderer, cameraPosition.x, cameraPosition.y, cameraPosition.z, partialTicks);
+            }
+
             for (final ClientSubLevel entitySubLevel : subLevels) {
                 final List<Entity> entities = level.getEntitiesOfClass(Entity.class, entitySubLevel.getPlot().getBoundingBox().toAABB().inflate(16.0));
 
@@ -258,4 +263,5 @@ public class NotSoSimpleSubLevelGroupRenderer {
             lightTexture.updateLightTexture(partialTicks);
         }
     }
+
 }

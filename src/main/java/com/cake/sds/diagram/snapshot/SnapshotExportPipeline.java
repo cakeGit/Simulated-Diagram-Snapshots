@@ -8,9 +8,8 @@ import com.cake.sds.diagram.render.CleanDiagramRenderer;
 import com.cake.sds.diagram.render.NotSoSimpleSubLevelGroupRenderer;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
-import dev.ryanhcode.sable.companion.math.BoundingBox3i;
-import dev.ryanhcode.sable.companion.math.BoundingBox3ic;
+import dev.ryanhcode.sable.companion.math.BoundingBox3d;
+import dev.ryanhcode.sable.companion.math.BoundingBox3dc;
 import dev.ryanhcode.sable.companion.math.Pose3dc;
 import dev.ryanhcode.sable.sublevel.ClientSubLevel;
 import dev.ryanhcode.sable.sublevel.SubLevel;
@@ -25,10 +24,9 @@ import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import org.joml.*;
 
-import java.lang.Math;
-
 import java.io.File;
 import java.io.IOException;
+import java.lang.Math;
 import java.util.Collection;
 import java.util.Locale;
 
@@ -66,12 +64,14 @@ public class SnapshotExportPipeline {
                        final SnapshotSettings settings, final float configYaw, final float configPitch) {
         final Minecraft mc = Minecraft.getInstance();
 
-        final BoundingBox3ic framingBounds = computeChainBounds(clientSubLevel);
+        final BoundingBox3dc framingBounds = computeChainBounds(clientSubLevel);
 
         final PlotCamera plotCamera = this.computePlotCamera(subLevel, framingBounds, settings, configYaw, configPitch);
         final int[] dims = this.computeExportDimensions(plotCamera, settings.resolution);
         final int w = dims[0];
         final int h = dims[1];
+
+        SimulatedDiagramSnapshots.LOGGER.info("Attempting to export diagram snapshot with dimensions {}x{}", w, h);
 
         final long estimatedMB = estimateMemoryUsageMB(w, h);
         if (estimatedMB >= MEMORY_CONFIRM_THRESHOLD_MB) {
@@ -86,18 +86,16 @@ public class SnapshotExportPipeline {
 
         this.freeFbos();
         this.exportFbo = AdvancedFbo.withSize(w, h).addColorTextureBuffer().setDepthTextureBuffer().build(true);
-        this.exportFbo.clear(0, 0, 0, 0);
-        this.exportOutlineFbo = AdvancedFbo.withSize(w, h).addColorTextureBuffer().build(true);
-        this.exportFinalFbo = AdvancedFbo.withSize(w, h).addColorTextureBuffer().build(true);
-        this.exportFinalFbo.clear(0, 0, 0, 0);
+        this.exportOutlineFbo = settings.snapshotStyle == SnapshotStyle.DIAGRAM ? AdvancedFbo.withSize(w, h).addColorTextureBuffer().build(true) : null;
+        this.exportFinalFbo = settings.snapshotStyle == SnapshotStyle.DIAGRAM ? AdvancedFbo.withSize(w, h).addColorTextureBuffer().build(true) : null;
 
         final float paletteOffset = settings.snapshotStyle == SnapshotStyle.DIAGRAM ? 0.25f : 1.0f;
         final float fadeScale = settings.snapshotStyle == SnapshotStyle.DIAGRAM ? 0.0f : 0.5f;
 
         if (settings.snapshotStyle == SnapshotStyle.DIAGRAM) {
             CleanDiagramRenderer.draw(subLevel, 0, plotCamera.orientation, plotCamera.projection, plotCamera.cameraPos,
-                    w, h, this.exportFbo, this.exportOutlineFbo, this.exportFinalFbo,
-                    paletteOffset, fadeScale, 0x2E3032, 0x696965);
+                w, h, this.exportFbo, this.exportOutlineFbo, this.exportFinalFbo,
+                paletteOffset, fadeScale, 0x2E3032, 0x696965);
         } else {
             drawClean(subLevel, 0, plotCamera.orientation, plotCamera.projection, plotCamera.cameraPos, this.exportFbo);
         }
@@ -116,8 +114,8 @@ public class SnapshotExportPipeline {
 
         final String name = clientSubLevel.getName();
         final String safeName = name != null && !name.isEmpty()
-                ? name.replaceAll("[^a-zA-Z0-9_\\-]", "_") + "_"
-                : "";
+            ? name.replaceAll("[^a-zA-Z0-9_\\-]", "_") + "_"
+            : "";
         final String timestamp = Util.getFilenameFormattedDateTime();
         final File file = findFreeFile(dir, "diagram_" + safeName + timestamp + ".png");
 
@@ -132,22 +130,22 @@ public class SnapshotExportPipeline {
         });
 
         mc.getToasts().addToast(SystemToast.multiline(mc,
-                TOAST_ID,
-                Component.translatable("simulated_diagram_snapshots.exported_diagram"),
-                Component.translatable("simulated_diagram_snapshots.saved_as", file.getName())));
+            TOAST_ID,
+            Component.translatable("simulated_diagram_snapshots.exported_diagram"),
+            Component.translatable("simulated_diagram_snapshots.saved_as", file.getName())));
 
         if (mc.player != null) {
             final Component clickable = Component.literal(file.getName())
-                    .withStyle(ChatFormatting.UNDERLINE)
-                    .withStyle(s -> s.withClickEvent(
-                            new ClickEvent(ClickEvent.Action.OPEN_FILE, file.getAbsolutePath())));
+                .withStyle(ChatFormatting.UNDERLINE)
+                .withStyle(s -> s.withClickEvent(
+                    new ClickEvent(ClickEvent.Action.OPEN_FILE, file.getAbsolutePath())));
             mc.player.sendSystemMessage(
-                    Component.translatable("simulated_diagram_snapshots.exported_chat", clickable));
+                Component.translatable("simulated_diagram_snapshots.exported_chat", clickable));
         }
     }
 
     public static void drawClean(final SubLevel subLevel, final float partialTicks, final Quaternionf localOrientation,
-                                  final Matrix4f projMatrix, final Vector3d cameraPos, final AdvancedFbo fbo) {
+                                 final Matrix4f projMatrix, final Vector3d cameraPos, final AdvancedFbo fbo) {
         fbo.bind(true);
         fbo.clear();
 
@@ -155,15 +153,18 @@ public class SnapshotExportPipeline {
         final Quaternionf orientation = new Quaternionf(renderPose.orientation()).conjugate();
         orientation.premul(localOrientation.conjugate(new Quaternionf()));
 
-        NotSoSimpleSubLevelGroupRenderer.renderChain(subLevel, fbo, new Matrix4f(), projMatrix, cameraPos, orientation, partialTicks, NotSoSimpleSubLevelGroupRenderer.LightingStyle.LEVEL);
+        NotSoSimpleSubLevelGroupRenderer.renderChain(subLevel, fbo, new Matrix4f(), projMatrix, cameraPos, orientation, partialTicks, NotSoSimpleSubLevelGroupRenderer.LightingStyle.FULLBRIGHT_LEVEL);
     }
 
-    private PlotCamera computePlotCamera(final SubLevel subLevel, final BoundingBox3ic framingBounds,
-                                          final SnapshotSettings settings, final float configYaw, final float configPitch) {
+    private PlotCamera computePlotCamera(final SubLevel subLevel, final BoundingBox3dc framingBounds,
+                                         final SnapshotSettings settings, final float configYaw, final float configPitch) {
         final ClientSubLevel clientSubLevel = (ClientSubLevel) subLevel;
 
-        final Vector3d plotCenter = plotCenterOf(framingBounds);
-        final Vector3f plotHalfExtents = plotHalfExtents(framingBounds);
+        final Pose3dc renderPose = clientSubLevel.renderPose(0);
+        final BoundingBox3d localBounds = framingBounds.transformInverse(renderPose, new BoundingBox3d());
+
+        final Vector3d plotCenter = plotCenterOf(localBounds);
+        final Vector3f plotHalfExtents = plotHalfExtents(localBounds);
         final Quaternionf orientation = buildCameraOrientation(settings.cameraMode, configYaw, configPitch);
         final Vector2f rotatedHalfExtents = rotatedPlotHalfExtents(orientation, plotHalfExtents);
 
@@ -174,23 +175,22 @@ public class SnapshotExportPipeline {
         final float farPlane = cameraDistance + sphereRadius;
 
         final Matrix4f projection = new Matrix4f().ortho(
-                -orthoHalfExtents.x, orthoHalfExtents.x,
-                -orthoHalfExtents.y, orthoHalfExtents.y,
-                ORTHO_Z_NEAR, farPlane);
+            -orthoHalfExtents.x, orthoHalfExtents.x,
+            -orthoHalfExtents.y, orthoHalfExtents.y,
+            ORTHO_Z_NEAR, farPlane);
 
         final Vector3d localCameraPos = new Vector3d(plotCenter.add(
-                orientation.transform(new Vector3d(0, 0, cameraDistance))));
-        final Pose3dc renderPose = clientSubLevel.renderPose(0);
+            orientation.transform(new Vector3d(0, 0, cameraDistance))));
         renderPose.transformPosition(localCameraPos);
 
         return new PlotCamera(orientation, projection, localCameraPos,
-                new Vector2f(orthoHalfExtents.x * 2, orthoHalfExtents.y * 2));
+            new Vector2f(orthoHalfExtents.x * 2, orthoHalfExtents.y * 2));
     }
 
     private Vector2f fitOrthoExtents(final Vector2f rotatedHalfExtents, final SnapshotResolution resolution) {
-        if (resolution != SnapshotResolution.PIXELATED) {
-            return naturalOrthoExtents(rotatedHalfExtents);
-        }
+//        if (resolution != SnapshotResolution.PIXELATED) {
+//            return naturalOrthoExtents(rotatedHalfExtents);
+//        }
         final float diagramAspect = (float) DiagramScreen.DIAGRAM_TEXTURE.width / DiagramScreen.DIAGRAM_TEXTURE.height;
         return aspectFitOrthoExtents(rotatedHalfExtents, diagramAspect, ORTHO_PADDING);
     }
@@ -204,33 +204,35 @@ public class SnapshotExportPipeline {
     }
 
     private static Quaternionf buildCameraOrientation(final CameraMode cameraMode,
-                                                       final float configYaw, final float configPitch) {
+                                                      final float configYaw, final float configPitch) {
         final Quaternionf orientation = new Quaternionf()
-                .rotateY(radians(configYaw))
-                .rotateX(radians(configPitch));
+            .rotateY(radians(configYaw))
+            .rotateX(radians(configPitch));
         switch (cameraMode) {
             case ISOMETRIC -> orientation.rotateY(radians(45.0f))
-                    .rotateX(radians(-35.264f));
+                .rotateX(radians(-35.264f));
             case DIMETRIC -> orientation.rotateY(radians(45.0f))
-                    .rotateX(radians(-28.12f));
-            case TRIMETRIC -> orientation.rotateY(radians(30.0f))
-                    .rotateX(radians(-50.0f));
+                .rotateX(radians(-17.38f));
+            case LOW_DIMETRIC -> orientation.rotateY(radians(45.0f))
+                .rotateX(radians(17.38f));
+            case LOW_ISOMETRIC -> orientation.rotateY(radians(45.0f))
+                .rotateX(radians(35.264f));
         }
         return orientation;
     }
 
-    private static Vector3d plotCenterOf(final BoundingBox3ic plotBounds) {
+    private static Vector3d plotCenterOf(final BoundingBox3dc plotBounds) {
         return new Vector3d(
-                (plotBounds.minX() + plotBounds.maxX() + 1) / 2.0,
-                (plotBounds.minY() + plotBounds.maxY() + 1) / 2.0,
-                (plotBounds.minZ() + plotBounds.maxZ() + 1) / 2.0);
+            (plotBounds.minX() + plotBounds.maxX()) / 2.0,
+            (plotBounds.minY() + plotBounds.maxY()) / 2.0,
+            (plotBounds.minZ() + plotBounds.maxZ()) / 2.0);
     }
 
-    private static Vector3f plotHalfExtents(final BoundingBox3ic plotBounds) {
+    private static Vector3f plotHalfExtents(final BoundingBox3dc plotBounds) {
         return new Vector3f(
-                (plotBounds.maxX() - plotBounds.minX() + 1) / 2.0f,
-                (plotBounds.maxY() - plotBounds.minY() + 1) / 2.0f,
-                (plotBounds.maxZ() - plotBounds.minZ() + 1) / 2.0f);
+            (float) ((plotBounds.maxX() - plotBounds.minX()) / 2.0f),
+            (float) ((plotBounds.maxY() - plotBounds.minY()) / 2.0f),
+            (float) ((plotBounds.maxZ() - plotBounds.minZ()) / 2.0f));
     }
 
     private static Vector2f rotatedPlotHalfExtents(final Quaternionf orientation, final Vector3f halfExtents) {
@@ -240,9 +242,9 @@ public class SnapshotExportPipeline {
         float maxAbsY = 0;
         for (int cornerIndex = 0; cornerIndex < 8; cornerIndex++) {
             corner.set(
-                    (cornerIndex & 1) == 0 ? -halfExtents.x : halfExtents.x,
-                    (cornerIndex & 2) == 0 ? -halfExtents.y : halfExtents.y,
-                    (cornerIndex & 4) == 0 ? -halfExtents.z : halfExtents.z);
+                (cornerIndex & 1) == 0 ? -halfExtents.x : halfExtents.x,
+                (cornerIndex & 2) == 0 ? -halfExtents.y : halfExtents.y,
+                (cornerIndex & 4) == 0 ? -halfExtents.z : halfExtents.z);
             invOrientation.transform(corner);
             final float absX = Math.abs(corner.x);
             final float absY = Math.abs(corner.y);
@@ -257,7 +259,7 @@ public class SnapshotExportPipeline {
     }
 
     private static Vector2f aspectFitOrthoExtents(final Vector2f halfExtents, final float aspect,
-                                                   final float padding) {
+                                                  final float padding) {
         final float paddedX = halfExtents.x * padding;
         final float paddedY = halfExtents.y * padding;
         final float halfWidth;
@@ -274,9 +276,9 @@ public class SnapshotExportPipeline {
 
     private static float boundingSphereRadius(final Vector3f halfExtents) {
         return (float) Math.sqrt(
-                halfExtents.x * halfExtents.x +
-                        halfExtents.y * halfExtents.y +
-                        halfExtents.z * halfExtents.z);
+            halfExtents.x * halfExtents.x +
+                halfExtents.y * halfExtents.y +
+                halfExtents.z * halfExtents.z);
     }
 
     private static float radians(final float degrees) {
@@ -284,14 +286,14 @@ public class SnapshotExportPipeline {
     }
 
     private int[] computeExportDimensions(final PlotCamera plotCamera, final SnapshotResolution resolution) {
-        if (resolution == SnapshotResolution.PIXELATED) {
-            return new int[]{DiagramScreen.DIAGRAM_TEXTURE.width, DiagramScreen.DIAGRAM_TEXTURE.height};
-        }
+//        if (resolution == SnapshotResolution.PIXELATED) {
+//            return new int[] {DiagramScreen.DIAGRAM_TEXTURE.width, DiagramScreen.DIAGRAM_TEXTURE.height};
+//        }
 
         final float pixelsPerBlock = resolution.scale() * BLOCK_PIXEL_SCALE;
         final int w = Math.max(1, Math.round(plotCamera.worldViewExtents.x * pixelsPerBlock));
         final int h = Math.max(1, Math.round(plotCamera.worldViewExtents.y * pixelsPerBlock));
-        return new int[]{w, h};
+        return new int[] {w, h};
     }
 
     private static long estimateMemoryUsageMB(final int w, final int h) {
@@ -304,10 +306,10 @@ public class SnapshotExportPipeline {
         final Minecraft mc = Minecraft.getInstance();
         final Component title = Component.translatable("simulated_diagram_snapshots.large_export_warning.title");
         final Component detail = Component.translatable(
-                "simulated_diagram_snapshots.large_export_warning.detail",
-                String.format(Locale.ROOT, "%,d", w),
-                String.format(Locale.ROOT, "%,d", h),
-                estimatedMB);
+            "simulated_diagram_snapshots.large_export_warning.detail",
+            String.format(Locale.ROOT, "%,d", w),
+            String.format(Locale.ROOT, "%,d", h),
+            estimatedMB);
         if (mc.player != null) {
             mc.gui.getChat().addMessage(title.copy().append("\n").append(detail));
         }
@@ -331,26 +333,28 @@ public class SnapshotExportPipeline {
     }
 
     private record PlotCamera(Quaternionf orientation, Matrix4f projection, Vector3d cameraPos,
-                               Vector2f worldViewExtents) {
+                              Vector2f worldViewExtents) {
+
     }
 
-    private static BoundingBox3ic computeChainBounds(final ClientSubLevel root) {
+    private static BoundingBox3dc computeChainBounds(final ClientSubLevel root) {
         final Collection<ClientSubLevel> chain = SimpleSubLevelGroupRenderer.getRenderedChain(root);
 
-        BoundingBox3i union = null;
+        BoundingBox3d union = null;
         for (final ClientSubLevel subLevel : chain) {
-            final BoundingBox3ic bounds = subLevel.getPlot().getBoundingBox();
+            final BoundingBox3dc bounds = subLevel.boundingBox();
             if (union == null) {
-                union = new BoundingBox3i(bounds);
+                union = new BoundingBox3d(bounds);
             } else {
                 union.expandTo(bounds);
             }
         }
 
         if (union == null) {
-            return root.getPlot().getBoundingBox();
+            return root.boundingBox();
         }
 
         return union;
     }
+
 }
