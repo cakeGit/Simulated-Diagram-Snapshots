@@ -80,7 +80,7 @@ public class OverlayRadioGroup<E extends Enum<E>> {
             final boolean selected = i == this.selectedIndex;
             final int color = selected ? SELECTED_COLOR : DESELECTED_COLOR;
 
-            final int tabX = x + PaperPanel.TAB_CX - (int) tabHide;
+            final int tabX = x + PaperPanel.TAB_CX - (int) tabHide - 1;
             final int tabY = lineY - 10;
             ps.pushPose();
             ps.translate(tabX + (SimGUITextures.DIAGRAM_TAB.width / 2f), tabY + (SimGUITextures.DIAGRAM_TAB.height / 2f), 0);
